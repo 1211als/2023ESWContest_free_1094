@@ -64,7 +64,7 @@ tof.open()
 tof.set_timing(1000, 50)
 tof.start_ranging(3)
 
-# send data to esp32
+# send data to esp32 using i2c
 def send_data_i2c(data):
     bytes_data = data.encode('utf-8')    
     if len(bytes_data) > 12:
