@@ -1,0 +1,7 @@
+
+train: ../drone/images/train/  
+val: ../drone/images/val/  
+
+# number of classes
+nc: 1
+names: ['drone']
