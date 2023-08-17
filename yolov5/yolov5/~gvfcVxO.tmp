@@ -42,11 +42,8 @@ bus = sm.SMBus(1)
 time.sleep(0.1)
 
 count = 0
-coordinate = None
+coordinate = "00000000"
 distance = 0
-
-last_coordinate = None
-prev_coordinate = None
 
 FILE = Path(__file__).resolve()
 ROOT = FILE.parents[0]  # YOLOv5 root directory
@@ -67,7 +64,7 @@ tof.open()
 tof.set_timing(1000, 50)
 tof.start_ranging(3)
 
-# send data to esp32
+# send data to esp32 using i2c
 def send_data_i2c(data):
     bytes_data = data.encode('utf-8')    
     if len(bytes_data) > 12:
@@ -76,9 +73,9 @@ def send_data_i2c(data):
 
 
 # combine & convert coordinate data to 8-digit str
-def coord(coordinate):
-        num1_str = "{:04}".format(coordinate[0])
-        num2_str = "{:04}".format(coordinate[1])
+def coord(num1, num2):
+        num1_str = "{:04}".format(num1)
+        num2_str = "{:04}".format(num2)
         combined = num1_str + num2_str
         return combined
 
@@ -115,22 +112,12 @@ def run(
         hide_conf=False,  # hide confidences
         half=False,  # use FP16 half-precision inference
         dnn=False,  # use OpenCV DNN for ONNX inference
-        mode=1,  #set turret mode : auto(1) or manual(0)
-        select = 'drone'  #select which objects to detect in auto - aim mode. default 'drone'
 ):
     source = str(source)
     save_img = not nosave and not source.endswith('.txt')  # save inference images
     is_file = Path(source).suffix[1:] in (IMG_FORMATS + VID_FORMATS)
     is_url = source.lower().startswith(('rtsp://', 'rtmp://', 'http://', 'https://'))
     webcam = source.isnumeric() or source.endswith('.txt') or (is_url and not is_file)
-     
-    if mode == 1:
-        turret_mode = True
-        print('\n\nTurret set to Auto - aim mode\n\n')
-    else:
-        turret_mode = False
-        print('\n\nTurret set to Manual mode\n\n')
-
     if is_url and is_file:
         source = check_file(source)  # download
 
@@ -221,64 +208,32 @@ def run(
 #                    s += f"{n} {names[int(c)]}{center_point}{'s' * (n > 1)}, "  # add to string
 
                 # Write results
-                for *xyxy, conf, cls in det:
-                    c = int(cls)
-                    if str(names[c]) == select:
-                        c1, c2 = (int(xyxy[0]), int(xyxy[1])), (int(xyxy[2]), int(xyxy[3]))   # seting the center coordinate of bbox
-                        center_point = round((c1[0] + c2[0])/2), round((c1[1] + c2[1])/2)
-                        global coordinate, last_coordinate, prev_coordinate
-                        coordinate = round((c1[0] + c2[0])/2), round(479 - (c1[1] + c2[1])/2)
-
-                        circle = cv2.circle(im0, center_point, 5, (255, 0, 0), 2)    # display the center coordinate & center circle         
-                        text_coord = cv2.putText(im0, str(coordinate), center_point, cv2.FONT_HERSHEY_PLAIN, 1, (0, 0, 255))
-
-                        last_coordinate = coordinate
-
-
-                        if save_img or save_crop or view_img:  # Add bbox to image
-                            c = int(cls)  # integer class
-                            label = None if hide_labels else (names[c] if hide_conf else f'{names[c]} {conf:.2f}')
-                            annotator.box_label(xyxy, label, color=colors(c, True))
-                            if save_crop:
-                                save_one_box(xyxy, imc, file=save_dir / 'crops' / names[c] / f'{p.stem}.jpg', BGR=True)
-
-
                 for *xyxy, conf, cls in reversed(det):
-                    c = int(cls)
-                    if str(names[c]) != select:
-                        c1, c2 = (int(xyxy[0]), int(xyxy[1])), (int(xyxy[2]), int(xyxy[3]))   # seting the center coordinate of bbox
-                        center_point = round((c1[0] + c2[0])/2), round((c1[1] + c2[1])/2)
+                    c1, c2 = (int(xyxy[0]), int(xyxy[1])), (int(xyxy[2]), int(xyxy[3]))   # seting the center coordinate of bbox
+                    center_point = round((c1[0] + c2[0])/2), round((c1[1] + c2[1])/2)
+                    global coordinate
+                    coordinate = coord(round((c1[0] + c2[0])/2), round((c1[1] + c2[1])/2))
 
-                        coordinate2 = round((c1[0] + c2[0])/2), round(479 - (c1[1] + c2[1])/2)
-
-                        circle = cv2.circle(im0, center_point, 5, (255, 0, 0), 2)    # display the center coordinate & center circle         
-                        text_coord = cv2.putText(im0, str(coordinate2), center_point, cv2.FONT_HERSHEY_PLAIN, 1, (0, 0, 255))
+                    circle = cv2.circle(im0, center_point, 5, (255, 0, 0), 2)    # display the center coordinate & center circle         
+                    text_coord = cv2.putText(im0, str(center_point), center_point, cv2.FONT_HERSHEY_PLAIN, 1, (0, 0, 255))  
 
 
-                        if save_img or save_crop or view_img:  # Add bbox to image
-                            c = int(cls)  # integer class
-                            label = None if hide_labels else (names[c] if hide_conf else f'{names[c]} {conf:.2f}')
-                            annotator.box_label(xyxy, label, color=colors(c, True))
-                            if save_crop:
-                                save_one_box(xyxy, imc, file=save_dir / 'crops' / names[c] / f'{p.stem}.jpg', BGR=True)
+                    if save_img or save_crop or view_img:  # Add bbox to image
+                        c = int(cls)  # integer class
+                        label = None if hide_labels else (names[c] if hide_conf else f'{names[c]} {conf:.2f}')
+                        annotator.box_label(xyxy, label, color=colors(c, True))
+                        if save_crop:
+                            save_one_box(xyxy, imc, file=save_dir / 'crops' / names[c] / f'{p.stem}.jpg', BGR=True)
 
-                
             # Stream results
             im0 = annotator.result()
             if view_img:
                 cv2.imshow(str(p), im0)
 #               cv2.waitKey(1)  # 1 millisecond
-            if prev_coordinate is not None and last_coordinate is not None:
-                delta_x = abs(last_coordinate[0] - prev_coordinate[0])
-                delta_y = abs(last_coordinate[1] - prev_coordinate[1])
-                if (delta_x >= 15 or delta_y >= 15) and turret_mode:            
-                    distance_formatted = "{:04}".format(distance)            # convert distance value to 4-digit str
-                    turret_data = str(str(coord(coordinate)) + distance_formatted)  # combine coordinate & distance data to 12-digit str
 
-                    send_data_i2c(turret_data)                               # send to esp32
-                    print(turret_data)
-
-            prev_coordinate = last_coordinate
+            distance_formatted = "{:04}".format(distance)            # convert distance value to 4-digit str
+            turret_data = str(str(coordinate) + distance_formatted)  # combine coordinate & distance data to 12-digit str
+            send_data_i2c(turret_data)                               # send to esp32
 
             
 
@@ -328,8 +283,6 @@ def parse_opt():
     parser.add_argument('--hide-conf', default=False, action='store_true', help='hide confidences')
     parser.add_argument('--half', action='store_true', help='use FP16 half-precision inference')
     parser.add_argument('--dnn', action='store_true', help='use OpenCV DNN for ONNX inference')
-    parser.add_argument('--mode', default=1, type=int, help='select mode')
-    parser.add_argument('--select', default='drone', type=str, help='select mode')
     opt = parser.parse_args()
     opt.imgsz *= 2 if len(opt.imgsz) == 1 else 1  # expand
     print_args(vars(opt))
