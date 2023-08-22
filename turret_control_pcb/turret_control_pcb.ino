@@ -40,8 +40,8 @@ void stepper(void *pvParameters) {
   gpio_pad_select_gpio(GPIO_NUM_18);
   gpio_set_direction(GPIO_NUM_18, GPIO_MODE_OUTPUT);
 
-  gpio_pad_select_gpio(GPIO_NUM_17);
-  gpio_set_direction(GPIO_NUM_17, GPIO_MODE_OUTPUT);
+  gpio_pad_select_gpio(GPIO_NUM_4);
+  gpio_set_direction(GPIO_NUM_4, GPIO_MODE_OUTPUT);
   
   while(1) {
     if (!moving && xQueueReceive(xQueue, &receivedValue, portMAX_DELAY)) {
@@ -60,7 +60,7 @@ void stepper(void *pvParameters) {
 
       if(difference > 0) {  // 양의 방향으로 회전
         gpio_set_level(GPIO_NUM_18, 1);
-        gpio_set_level(GPIO_NUM_17, 1);
+        gpio_set_level(GPIO_NUM_4, 1);
         for(int i=0; i<halfDifference; i++) {
           gpio_set_level(GPIO_NUM_19, 1);  
           gpio_set_level(GPIO_NUM_5, 1);          
@@ -73,7 +73,7 @@ void stepper(void *pvParameters) {
       } 
       else if(difference < 0) {  // 음의 방향으로 회전     
         gpio_set_level(GPIO_NUM_18, 0);
-        gpio_set_level(GPIO_NUM_17, 0);
+        gpio_set_level(GPIO_NUM_4, 0);
         for(int i=0; i<halfDifference; i++) {  // 차이의 절대값만큼 반복
           gpio_set_level(GPIO_NUM_19, 1);  
           gpio_set_level(GPIO_NUM_5, 1);          
@@ -247,7 +247,7 @@ void loop() {
   adcValue1 = analogRead(14);
   if(adcValue1 > 3000){
     gpio_set_level(GPIO_NUM_18, 1);
-    gpio_set_level(GPIO_NUM_17, 1);
+    gpio_set_level(GPIO_NUM_4, 1);
     if(adcValue1 > 4086){
       for(int x = 0; x < 10; x++){
         gpio_set_level(GPIO_NUM_19, 1);  
@@ -274,7 +274,7 @@ void loop() {
 
   if(adcValue1 < 1000){
     gpio_set_level(GPIO_NUM_18, 0);
-    gpio_set_level(GPIO_NUM_17, 0);
+    gpio_set_level(GPIO_NUM_4, 0);
     if(adcValue1 < 5){
       for(int x = 0; x < 10; x++){
         gpio_set_level(GPIO_NUM_19, 1);  
