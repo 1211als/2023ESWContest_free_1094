@@ -89,7 +89,7 @@ pre_distance = None
 
 @torch.no_grad()
 def run(
-        weights=ROOT / 'arona.pt',  # model.pt path(s)
+        weights=ROOT / 'drone_v7.pt',  # model.pt path(s)
         source=ROOT / 'data/images',  # file/dir/URL/glob, 0 for webcam
         data=ROOT / 'data/coco128.yaml',  # dataset.yaml path
         imgsz=(416, 416),  # inference size (height, width)

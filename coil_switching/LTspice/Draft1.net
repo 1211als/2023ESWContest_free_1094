@@ -1,0 +1,16 @@
+* X:\Embedded\data\Draft1.asc
+D1 N002 N001 RB068M-60
+M1 N002 N003 0 0 IRLH5036
+L1 N001 N002 80µ Rser=0.12
+V2 N001 0 44.4 Rser=0.12
+R3 N003 0 10k
+R4 N003 N004 10
+V3 N004 0 PULSE(0 12 0 0 0 0.004 0.008 500)
+.model D D
+.lib C:\Program Files (x86)\LTC\LTspiceIV\lib\cmp\standard.dio
+.model NMOS NMOS
+.model PMOS PMOS
+.lib C:\Program Files (x86)\LTC\LTspiceIV\lib\cmp\standard.mos
+.tran 40m
+.backanno
+.end

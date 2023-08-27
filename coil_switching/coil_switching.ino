@@ -26,7 +26,7 @@ unsigned long previousMillis6 = 0;
 void adc_init(void) {    
   ADMUX = (1 << REFS0);              
   ADMUX &= ~(1 << ADLAR);            
-  ADCSRA = (1 << ADEN) | 4;          
+  ADCSRA = (1 << ADEN) | 4;  //set adc prescaler 16
 }
 
 uint16_t adc_read(unsigned char channel){         
