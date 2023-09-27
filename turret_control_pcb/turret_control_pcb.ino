@@ -30,7 +30,7 @@ int currentsens1 = 1;
 
 void stepper(void *pvParameters) {  //Task to drive the stepper motor with the input coordinates
   int receivedValue;
-  static int prevReceivedValue = 432;  //Set initial value to 432
+  static int prevReceivedValue = 640;  //Set initial value to 432
   int difference;
   int moving = 0;
   
@@ -49,7 +49,7 @@ void stepper(void *pvParameters) {  //Task to drive the stepper motor with the i
   while(1) {
     if (!moving && xQueueReceive(xQueue, &receivedValue, portMAX_DELAY)) {
       moving = 1;
-      if(receivedValue >= 863) receivedValue = 863;
+      if(receivedValue >= 1279) receivedValue = 1279;
       if(receivedValue <= 0) receivedValue = 0;  
 
       difference = receivedValue - prevReceivedValue;  //Calculate the difference
@@ -87,7 +87,7 @@ void stepper(void *pvParameters) {  //Task to drive the stepper motor with the i
           vTaskDelay(4 / portTICK_PERIOD_MS);
         }
       }
-      prevReceivedValue = 432; 
+      prevReceivedValue = 640; 
       moving = 0;
 
       int dummy;
@@ -99,7 +99,7 @@ void stepper(void *pvParameters) {  //Task to drive the stepper motor with the i
 
 void linear_act(void *pvParameters) {  //Task to drive the linear actuator with the input coordinates
   int receivedValue;
-  static int prevValue = 240;  //Set initial value to 240
+  static int prevValue = 360;  //Set initial value to 240
   int moving = 0;
 
   ledcSetup(0, 1000, 10);
@@ -154,7 +154,7 @@ void linear_act(void *pvParameters) {  //Task to drive the linear actuator with 
         ledcWrite(3, 0);
       }
 
-      prevValue = 240; 
+      prevValue = 360; 
       moving = 0;
 
       int dummy;
@@ -188,7 +188,7 @@ void receiveData(int bytes) {  //Data received from Jetson Nano via i2c
   strncpy(part3, received_data + 8, 4);
   part3[4] = '\0';
 
-  Serial.println("receive");
+  Serial.println(received_data);
 
   int intPart1 = atoi(part1);  //x coordinate
   int intPart2 = atoi(part2);  //y coordinate
@@ -249,7 +249,7 @@ void setup() {
   
   Serial.begin(115200);
   
-  int setupdata = 432;
+  int setupdata = 640;
   xQueueSend(xQueue, &setupdata, portMAX_DELAY);
 }
 

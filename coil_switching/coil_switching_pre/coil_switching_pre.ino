@@ -38,7 +38,7 @@ void setup(){
   Serial.begin(9600);
   adc_init();
   DDRD |= _BV(7);  
-  DDRB |= _BV(0)|_BV(1)|_BV(2)|_BV(3)|_BV(4); // Set GPIO 7 ~ 12 is output;
+  DDRB |= _BV(0)|_BV(1)|_BV(2); // Set GPIO 7 ~ 12 is output;
 }
 
 void loop(){       
@@ -50,7 +50,7 @@ void loop(){
       PORTD &= ~_BV(7);
     }
   }
-  else if(currentsens1 > 600){
+  else if(currentsens1 >= 600){
     previousMillis1 = micros();
     PORTD &= ~_BV(7);
   }
@@ -64,7 +64,7 @@ void loop(){
       PORTB &= ~_BV(0);
     }
   } 
-  else if(currentsens2 > 600){
+  else if(currentsens2 >= 600){
     previousMillis2 = micros();
     PORTB &= ~_BV(0);
   }
@@ -74,11 +74,11 @@ void loop(){
   if(currentsens3 < 600){
     currentMillis3 = micros();   
     PORTB |= _BV(1);
-    if(currentMillis3 - previousMillis3 > 3000){
+    if(currentMillis3 - previousMillis3 > 4000){
       PORTB &= ~_BV(1);
     }
-  } 
-  else if(currentsens3 > 600){
+  }
+  else if(currentsens3 >= 600){
     previousMillis3 = micros();
     PORTB &= ~_BV(1);
   }
@@ -86,15 +86,14 @@ void loop(){
 
   currentsens4 = adc_read(2);
   if(currentsens4 < 600){
-    currentMillis4 = micros();   
+    currentMillis4 = micros();
     PORTB |= _BV(2);
-    if(currentMillis4 - previousMillis4 > 3000){
+    if(currentMillis4 - previousMillis4 > 4000){
       PORTB &= ~_BV(2);
     }
-  } 
-  else if(currentsens4 > 600){
+  }
+  else if(currentsens4 >= 600){
     previousMillis4 = micros();
     PORTB &= ~_BV(2);
   }
-
 }

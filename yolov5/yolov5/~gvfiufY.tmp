@@ -25,9 +25,7 @@ Usage - formats:
 """
 
 import argparse
-import csv
 import os
-import platform
 import sys
 from pathlib import Path
 import sys
@@ -38,12 +36,6 @@ import torch.backends.cudnn as cudnn
 
 import smbus as sm
 import VL53L1X
-import subprocess
-from PyQt5.QtCore import Qt, QCoreApplication
-from PyQt5.QtGui import QImage, QPixmap
-from PyQt5.QtWidgets import QApplication, QMainWindow, QLabel, QSlider, QVBoxLayout, QWidget, QPushButton, QHBoxLayout, QButtonGroup
-
-from gui_module import CustomWidget, button1_func, button2_func, button3_func, button4_func, button5_func, gui_setting, gui_window, gui_exec
 
 address = 0x40
 bus = sm.SMBus(1)
@@ -53,14 +45,8 @@ count = 0
 coordinate = None
 distance = 0
 
-select = None
-mode = 0
-
 last_coordinate = None
 prev_coordinate = None
-
-prev_turret_mode = 0
-send_count = 0
 
 FILE = Path(__file__).resolve()
 ROOT = FILE.parents[0]  # YOLOv5 root directory
@@ -74,7 +60,6 @@ from utils.general import (LOGGER, check_file, check_img_size, check_imshow, che
                            increment_path, non_max_suppression, print_args, scale_coords, strip_optimizer, xyxy2xywh)
 from utils.plots import Annotator, colors, save_one_box
 from utils.torch_utils import select_device, time_sync
-
 
 # tof distance sensor setting
 tof = VL53L1X.VL53L1X(i2c_bus=0, i2c_address=0x29)
@@ -97,48 +82,14 @@ def coord(coordinate):
         combined = num1_str + num2_str
         return combined
 
-def set_zoom(value):
-	if 0 <= value <=260:
-		cmd = ["v4l2-ctl", "--set-ctrl=zoom_absolute={}".format(value)]
-		subprocess.run(cmd)
-
 
 
 pre_distance = None
 
-class CustomWidget(QWidget):
-    def __init__(self, parent=None):
-        super(CustomWidget, self).__init__(parent)
-
-    def keyPressEvent(self, event):
-        if event.key() == Qt.Key_Escape:
-            self.close()
-            sys.exit()
-
-def button1_func():
-    global select
-    select = 'drone'
-
-def button2_func():
-    global select
-    select = 'jet'
-
-def button3_func():
-    global select
-    select = 'bird'
-
-def button4_func():
-    global mode
-    mode = 1
-
-def button5_func():
-    global mode
-    mode = 0
-
 
 @torch.no_grad()
 def run(
-        weights=ROOT / 'arona.pt',  # model.pt path(s)
+        weights=ROOT / 'drone_v7.pt',  # model.pt path(s)
         source=ROOT / 'data/images',  # file/dir/URL/glob, 0 for webcam
         data=ROOT / 'data/coco128.yaml',  # dataset.yaml path
         imgsz=(416, 416),  # inference size (height, width)
@@ -164,12 +115,21 @@ def run(
         hide_conf=False,  # hide confidences
         half=False,  # use FP16 half-precision inference
         dnn=False,  # use OpenCV DNN for ONNX inference
+        mode=1,  #set turret mode : auto(1) or manual(0)
+        select = 'drone'  #select which objects to detect in auto - aim mode. default 'drone'
 ):
     source = str(source)
     save_img = not nosave and not source.endswith('.txt')  # save inference images
     is_file = Path(source).suffix[1:] in (IMG_FORMATS + VID_FORMATS)
     is_url = source.lower().startswith(('rtsp://', 'rtmp://', 'http://', 'https://'))
     webcam = source.isnumeric() or source.endswith('.txt') or (is_url and not is_file)
+     
+    if mode == 1:
+        turret_mode = True
+        print('\n\nTurret set to Auto - aim mode\n\n')
+    else:
+        turret_mode = False
+        print('\n\nTurret set to Manual mode\n\n')
 
     if is_url and is_file:
         source = check_file(source)  # download
@@ -197,84 +157,7 @@ def run(
 
     # Run inference
     model.warmup(imgsz=(1 if pt else bs, 3, *imgsz))  # warmup
-    dt, seen, windows = [0.0, 0.0, 0.0], 0, []
-
-#    cv2.namedWindow('Webcam')
-#    cv2.createTrackbar('zoom', 'Webcam', 0, 260, on_trackbar)
-
-    app = QApplication([])
-
-    main_widget = CustomWidget()
-    main_widget.resize(1300, 740)
-    main_widget.setWindowTitle("Turret System")
-
-    main_layout = QHBoxLayout(main_widget)
-    v_layout = QVBoxLayout()
-
-    image_label = QLabel(main_widget)
-
-    v_layout.addWidget(image_label)
-
-
-    slider = QSlider(Qt.Horizontal, main_widget)
-    slider.setMinimum(0)
-    slider.setMaximum(260)
-    slider.valueChanged.connect(set_zoom)
-    v_layout.addWidget(slider)
-
-      
-    button1 = QPushButton("Drone", main_widget)
-    button1.setCheckable(True)
-    button1.setChecked(True)
-    button1.setFixedSize(150, 60)
-    button1.toggled.connect(button1_func)
-
-    button2 = QPushButton("Jet", main_widget)
-    button2.setCheckable(True)
-    button2.setFixedSize(150, 60)
-    button2.toggled.connect(button2_func)
-
-    button3 = QPushButton("Bird", main_widget)
-    button3.setCheckable(True)
-    button3.setFixedSize(150, 60)
-    button3.toggled.connect(button3_func)
-
-
-    button4 = QPushButton("Auto - aim", main_widget)
-    button4.setCheckable(True)
-    button4.setFixedSize(150, 60)
-    button4.toggled.connect(button4_func)
-
-    button5 = QPushButton("Manual", main_widget)
-    button5.setCheckable(True)
-    button5.setChecked(True)
-    button5.setFixedSize(150, 60)
-    button5.toggled.connect(button5_func)
-
-    button_group = QButtonGroup(main_widget)
-    button_group.addButton(button1)
-    button_group.addButton(button2)
-    button_group.addButton(button3)
-
-    button_group2 = QButtonGroup(main_widget)
-    button_group2.addButton(button4)
-    button_group2.addButton(button5)
-    
-    vbox_all_buttons = QVBoxLayout()
-    vbox_all_buttons.addWidget(button1)
-    vbox_all_buttons.addWidget(button2)
-    vbox_all_buttons.addWidget(button3)
-    vbox_all_buttons.addStretch(2)
-    vbox_all_buttons.addWidget(button4)
-    vbox_all_buttons.addWidget(button5)
-  
-    main_layout.addLayout(v_layout)
-    main_layout.addLayout(vbox_all_buttons)
-
-    main_widget.setLayout(main_layout)
-    main_widget.show()
-
-
+    dt, seen = [0.0, 0.0, 0.0], 0
     for path, im, im0s, vid_cap, s in dataset:
         t1 = time_sync()
         im = torch.from_numpy(im).to(device)
@@ -341,89 +224,61 @@ def run(
                 for *xyxy, conf, cls in det:
                     c = int(cls)
                     if str(names[c]) == select:
-                        bbox_width = xyxy[2] - xyxy[0]
-                        bbox_height = xyxy[3] - xyxy[1]
-                        if bbox_width < 850 and bbox_height < 480:
-                            c1, c2 = (int(xyxy[0]), int(xyxy[1])), (int(xyxy[2]), int(xyxy[3]))   # seting the center coordinate of bbox
-                            center_point = round((c1[0] + c2[0])/2), round((c1[1] + c2[1])/2)
-                            global coordinate, last_coordinate, prev_coordinate
-                            coordinate = round((c1[0] + c2[0])/2), round(719 - (c1[1] + c2[1])/2)
+                        c1, c2 = (int(xyxy[0]), int(xyxy[1])), (int(xyxy[2]), int(xyxy[3]))   # seting the center coordinate of bbox
+                        center_point = round((c1[0] + c2[0])/2), round((c1[1] + c2[1])/2)
+                        global coordinate, last_coordinate, prev_coordinate
+                        coordinate = round((c1[0] + c2[0])/2), round(479 - (c1[1] + c2[1])/2)
 
-                            circle = cv2.circle(im0, center_point, 5, (255, 0, 0), 2)    # display the center coordinate & center circle         
-                            text_coord = cv2.putText(im0, str(coordinate), center_point, cv2.FONT_HERSHEY_PLAIN, 1, (0, 0, 255))
+                        circle = cv2.circle(im0, center_point, 5, (255, 0, 0), 2)    # display the center coordinate & center circle         
+                        text_coord = cv2.putText(im0, str(coordinate), center_point, cv2.FONT_HERSHEY_PLAIN, 1, (0, 0, 255))
 
-                            last_coordinate = coordinate
+                        last_coordinate = coordinate
 
 
-                            if save_img or save_crop or view_img:  # Add bbox to image
-                                c = int(cls)  # integer class
-                                label = None if hide_labels else (names[c] if hide_conf else f'{names[c]} {conf:.2f}')
-                                annotator.box_label(xyxy, label, color=colors(c, True))
-                                if save_crop:
-                                    save_one_box(xyxy, imc, file=save_dir / 'crops' / names[c] / f'{p.stem}.jpg', BGR=True)
+                        if save_img or save_crop or view_img:  # Add bbox to image
+                            c = int(cls)  # integer class
+                            label = None if hide_labels else (names[c] if hide_conf else f'{names[c]} {conf:.2f}')
+                            annotator.box_label(xyxy, label, color=colors(c, True))
+                            if save_crop:
+                                save_one_box(xyxy, imc, file=save_dir / 'crops' / names[c] / f'{p.stem}.jpg', BGR=True)
 
 
                 for *xyxy, conf, cls in reversed(det):
                     c = int(cls)
                     if str(names[c]) != select:
-                        bbox_width = xyxy[2] - xyxy[0]
-                        bbox_height = xyxy[3] - xyxy[1]
-                        if bbox_width < 850 and bbox_height < 480:
-                            c1, c2 = (int(xyxy[0]), int(xyxy[1])), (int(xyxy[2]), int(xyxy[3]))   # seting the center coordinate of bbox
-                        
+                        c1, c2 = (int(xyxy[0]), int(xyxy[1])), (int(xyxy[2]), int(xyxy[3]))   # seting the center coordinate of bbox
+                        center_point = round((c1[0] + c2[0])/2), round((c1[1] + c2[1])/2)
+
+                        coordinate2 = round((c1[0] + c2[0])/2), round(479 - (c1[1] + c2[1])/2)
+
+                        circle = cv2.circle(im0, center_point, 5, (255, 0, 0), 2)    # display the center coordinate & center circle         
+                        text_coord = cv2.putText(im0, str(coordinate2), center_point, cv2.FONT_HERSHEY_PLAIN, 1, (0, 0, 255))
 
 
-                            if save_img or save_crop or view_img:  # Add bbox to image
-                                c = int(cls)  # integer class
-                                label = None if hide_labels else (names[c] if hide_conf else f'{names[c]} {conf:.2f}')
-                                annotator.box_label(xyxy, label, color=colors(c, True))
-                                if save_crop:
-                                    save_one_box(xyxy, imc, file=save_dir / 'crops' / names[c] / f'{p.stem}.jpg', BGR=True)
+                        if save_img or save_crop or view_img:  # Add bbox to image
+                            c = int(cls)  # integer class
+                            label = None if hide_labels else (names[c] if hide_conf else f'{names[c]} {conf:.2f}')
+                            annotator.box_label(xyxy, label, color=colors(c, True))
+                            if save_crop:
+                                save_one_box(xyxy, imc, file=save_dir / 'crops' / names[c] / f'{p.stem}.jpg', BGR=True)
 
-            
                 
             # Stream results
             im0 = annotator.result()
-           
             if view_img:
-                if platform.system() == 'Linux' and p not in windows:
-                    windows.append(p)
-
-            im0 = cv2.cvtColor(im0, cv2.COLOR_BGR2RGB)
-            height, width, channel = im0.shape
-            bytes_per_line = 3 * width
-            q_image = QImage(im0.data, width, height, bytes_per_line, QImage.Format_RGB888)
-            pixmap = QPixmap.fromImage(q_image)
-            
-            image_label.setPixmap(pixmap.scaled(1280, 720, Qt.KeepAspectRatio))
-
-            app.processEvents()
-
-
-
-#                cv2.imshow('Webcam', im0)             
-#                cv2.waitKey(1)  # 1 millisecond
-
-            global prev_turret_mode
+                cv2.imshow(str(p), im0)
+#               cv2.waitKey(1)  # 1 millisecond
             if prev_coordinate is not None and last_coordinate is not None:
-                global send_count
                 delta_x = abs(last_coordinate[0] - prev_coordinate[0])
                 delta_y = abs(last_coordinate[1] - prev_coordinate[1])
-                if prev_turret_mode == 0 and mode == 1:
-                   send_count = 1
-                if (send_count > 0 or (delta_x >= 5 or delta_y >= 5)) and mode:            
+                if (delta_x >= 15 or delta_y >= 15) and turret_mode:            
                     distance_formatted = "{:04}".format(distance)            # convert distance value to 4-digit str
                     turret_data = str(str(coord(coordinate)) + distance_formatted)  # combine coordinate & distance data to 12-digit str
 
                     send_data_i2c(turret_data)                               # send to esp32
-#                    print(turret_data)
-                    if send_count > 0:
-                        send_count -= 1
+                    print(turret_data)
 
             prev_coordinate = last_coordinate
-
-            prev_turret_mode = mode            
-                       
 
             
 
@@ -431,7 +286,8 @@ def run(
 #        LOGGER.info(f'{s}Done. ({t3 - t2:.3f}s)')
 #        print(f'{s}Done. ({t3 - t2:.3f}s)')
 
-    app.exec_()
+
+
     # Print results
     t = tuple(x / seen * 1E3 for x in dt)  # speeds per image
     LOGGER.info(f'Speed: %.1fms pre-process, %.1fms inference, %.1fms NMS per image at shape {(1, 3, *imgsz)}' % t)
@@ -441,7 +297,6 @@ def run(
     if update:
         strip_optimizer(weights)  # update model (to fix SourceChangeWarning)
 
-    
 
 
 
@@ -473,6 +328,8 @@ def parse_opt():
     parser.add_argument('--hide-conf', default=False, action='store_true', help='hide confidences')
     parser.add_argument('--half', action='store_true', help='use FP16 half-precision inference')
     parser.add_argument('--dnn', action='store_true', help='use OpenCV DNN for ONNX inference')
+    parser.add_argument('--mode', default=1, type=int, help='select mode')
+    parser.add_argument('--select', default='drone', type=str, help='select mode')
     opt = parser.parse_args()
     opt.imgsz *= 2 if len(opt.imgsz) == 1 else 1  # expand
     print_args(vars(opt))
@@ -480,9 +337,6 @@ def parse_opt():
 
 
 def main(opt):
-    set_zoom(0)
-    global select, mode
-    select = 'drone'
     check_requirements(exclude=('tensorboard', 'thop'))
     run(**vars(opt))
 
