@@ -1,5 +1,6 @@
 #include "Wire.h"
 #include "driver/gpio.h"
+#include "driver/adc.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 
@@ -30,7 +31,7 @@ int currentsens1 = 1;
 
 void stepper(void *pvParameters) {  //Task to drive the stepper motor with the input coordinates
   int receivedValue;
-  static int prevReceivedValue = 640;  //Set initial value to 432
+  static int prevReceivedValue = 640;  //Set initial value to 640
   int difference;
   int moving = 0;
   
@@ -67,11 +68,11 @@ void stepper(void *pvParameters) {  //Task to drive the stepper motor with the i
         for(int i=0; i<halfDifference; i++) {  //Repeat as much as the absolute value of the difference
           gpio_set_level(GPIO_NUM_19, 1);  
           gpio_set_level(GPIO_NUM_5, 1);          
-          vTaskDelay(4 / portTICK_PERIOD_MS);
+          vTaskDelay(3 / portTICK_PERIOD_MS);
         
           gpio_set_level(GPIO_NUM_19, 0);  
           gpio_set_level(GPIO_NUM_5, 0);         
-          vTaskDelay(4 / portTICK_PERIOD_MS);
+          vTaskDelay(3 / portTICK_PERIOD_MS);
         }
       } 
       else if(difference < 0) {  //Reverse     
@@ -80,11 +81,11 @@ void stepper(void *pvParameters) {  //Task to drive the stepper motor with the i
         for(int i=0; i<halfDifference; i++) {  //Repeat as much as the absolute value of the difference
           gpio_set_level(GPIO_NUM_19, 1);  
           gpio_set_level(GPIO_NUM_5, 1);          
-          vTaskDelay(4 / portTICK_PERIOD_MS);
+          vTaskDelay(3 / portTICK_PERIOD_MS);
         
           gpio_set_level(GPIO_NUM_19, 0);  
           gpio_set_level(GPIO_NUM_5, 0);         
-          vTaskDelay(4 / portTICK_PERIOD_MS);
+          vTaskDelay(3 / portTICK_PERIOD_MS);
         }
       }
       prevReceivedValue = 640; 
@@ -99,7 +100,7 @@ void stepper(void *pvParameters) {  //Task to drive the stepper motor with the i
 
 void linear_act(void *pvParameters) {  //Task to drive the linear actuator with the input coordinates
   int receivedValue;
-  static int prevValue = 360;  //Set initial value to 240
+  static int prevValue = 360;  //Set initial value to 360
   int moving = 0;
 
   ledcSetup(0, 1000, 10);
@@ -233,6 +234,9 @@ void setup() {
   gpio_pad_select_gpio(GPIO_NUM_27);
   gpio_set_direction(GPIO_NUM_27, GPIO_MODE_OUTPUT);
 
+  adc2_config_channel_atten(ADC2_CHANNEL_6, ADC_ATTEN_DB_11); //adc14
+  adc2_config_channel_atten(ADC2_CHANNEL_5, ADC_ATTEN_DB_11); //adc12
+
   ledcSetup(0, 1000, 10);
   ledcAttachPin(25, 0);
 
@@ -254,8 +258,8 @@ void setup() {
 }
 
 void loop() {
-    
-  adcValue1 = analogRead(14);  //Control the turret manually
+  int adcValue1, adcValue2;  
+  adc2_get_raw(ADC2_CHANNEL_6, ADC_WIDTH_12Bit, &adcValue1); //adc14
   if(adcValue1 > 3000){
     gpio_set_level(GPIO_NUM_18, 1);
     gpio_set_level(GPIO_NUM_4, 1);
@@ -309,8 +313,8 @@ void loop() {
       }
     }
   }
-
-  adcValue2 = analogRead(12);
+  
+  adc2_get_raw(ADC2_CHANNEL_5, ADC_WIDTH_12Bit, &adcValue2); //adc12
   if(adcValue2 > 3000 && currentState != 1) {
     ledcWrite(0, 970);
     ledcWrite(1, 0);

@@ -41,7 +41,7 @@ void setup(){
   DDRB |= _BV(0)|_BV(1)|_BV(2); // Set GPIO 7 ~ 12 is output;
 }
 
-void loop(){       
+void loop(){
   currentsens1 = adc_read(5);
   if(currentsens1 < 600){
     currentMillis1 = micros();   
