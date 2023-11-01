@@ -20,7 +20,6 @@ class turretsystem:
     def __init__(self):
         self.select = 'drone'
         self.mode = 0
-        self.fire = 0
         self.app, self.main_widget, self.image_label = self.gui_init()
 
 
@@ -45,15 +44,9 @@ class turretsystem:
     def button5_func(self): # manual
         self.mode = 0
 
+    def button6_func(self): # auto - detect
+        self.mode = 2
 
-    def button6_func(self): # semi - auto
-        self.fire = 0
-
-    def button7_func(self): # 3 - burst
-        self.fire = 1
-
-    def button8_func(self): # full - auto
-        self.fire = 2
 
 
     def get_select(self):
@@ -61,9 +54,6 @@ class turretsystem:
 
     def get_mode(self):
         return self.mode
-
-    def get_fire(self):
-        return self.fire
 
 
     def gui_init(self):
@@ -116,23 +106,10 @@ class turretsystem:
         button5.setFixedSize(150, 60)
         button5.toggled.connect(self.button5_func)
 
-        
-        button6 = QPushButton("Semi - auto", main_widget)
+        button6 = QPushButton("Auto - detect", main_widget)
         button6.setCheckable(True)
         button6.setFixedSize(150, 60)
         button6.toggled.connect(self.button6_func)
-
-        button7 = QPushButton("3 - Burst", main_widget)
-        button7.setCheckable(True)
-        button7.setChecked(True)
-        button7.setFixedSize(150, 60)
-        button7.toggled.connect(self.button7_func)
-
-        button8 = QPushButton("Full - auto", main_widget)
-        button8.setCheckable(True)
-        button8.setFixedSize(150, 60)
-        button8.toggled.connect(self.button8_func)
-
 
         button_group = QButtonGroup(main_widget)
         button_group.addButton(button1)
@@ -142,11 +119,7 @@ class turretsystem:
         button_group2 = QButtonGroup(main_widget)
         button_group2.addButton(button4)
         button_group2.addButton(button5)
-
-        button_group3 = QButtonGroup(main_widget)
-        button_group3.addButton(button6)
-        button_group3.addButton(button7)
-        button_group3.addButton(button8)
+        button_group2.addButton(button6)
     
         vbox_all_buttons = QVBoxLayout()
         vbox_all_buttons.addWidget(button1)
@@ -155,10 +128,7 @@ class turretsystem:
         vbox_all_buttons.addStretch(2)
         vbox_all_buttons.addWidget(button4)
         vbox_all_buttons.addWidget(button5)
-        vbox_all_buttons.addStretch(2)
         vbox_all_buttons.addWidget(button6)
-        vbox_all_buttons.addWidget(button7)
-        vbox_all_buttons.addWidget(button8)
   
         main_layout.addLayout(v_layout)
         main_layout.addLayout(vbox_all_buttons)

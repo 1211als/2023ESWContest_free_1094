@@ -32,7 +32,6 @@ import sys
 from pathlib import Path
 import sys
 import time
-import serial
 
 import torch
 import torch.backends.cudnn as cudnn
@@ -46,16 +45,16 @@ from PyQt5.QtWidgets import QApplication, QMainWindow, QLabel, QSlider, QVBoxLay
 
 from gui_module import turretsystem
 
+address = 0x40
+bus = sm.SMBus(1)
+time.sleep(0.1)
+
 count = 0
-coordinate = [0, 0]
+coordinate = None
 distance = 0
 
 sw_select = False
 mode = 0
-
-turret_data = "0000000000001"
-
-status = None
 
 last_coordinate = None
 prev_coordinate = None
@@ -68,24 +67,14 @@ direction = 1
 delta_x = 0
 delta_y = 0
 
-distance_set = 5
-
-mode_state = False
-
-count_frame = 0
-
 prev_turret_mode = 0
 send_count = 0
-
-distance_formatted = "0000"
 
 FILE = Path(__file__).resolve()
 ROOT = FILE.parents[0]  # YOLOv5 root directory
 if str(ROOT) not in sys.path:
     sys.path.append(str(ROOT))  # add ROOT to PATH
 ROOT = Path(os.path.relpath(ROOT, Path.cwd()))  # relative
-
-ser = serial.Serial('/dev/ttyTHS1', 115200, timeout=1)
 
 from models.common import DetectMultiBackend
 from utils.datasets import IMG_FORMATS, VID_FORMATS, LoadImages, LoadStreams
@@ -96,18 +85,17 @@ from utils.torch_utils import select_device, time_sync
 
 
 # tof distance sensor setting
-tof = VL53L1X.VL53L1X(i2c_bus=1, i2c_address=0x29)
+tof = VL53L1X.VL53L1X(i2c_bus=0, i2c_address=0x29)
 tof.open()
 tof.set_timing(1000, 50)
 tof.start_ranging(3)
 
-
 # send data to esp32
-def send_data_uart(data):
+def send_data_i2c(data):
     bytes_data = data.encode('utf-8')    
-    if len(bytes_data) > 13:
+    if len(bytes_data) > 12:
         raise ValueError("Data length exceeds 12 bytes")
-    ser.write(bytes_data)
+    bus.write_i2c_block_data(address, 0x00, list(bytes_data))
 
 
 # combine & convert coordinate data to 8-digit str
@@ -117,9 +105,20 @@ def coord(coordinate):
         combined = num1_str + num2_str
         return combined
 
+def set_zoom(value):
+	if 0 <= value <=260:
+		cmd = ["v4l2-ctl", "--set-ctrl=zoom_absolute={}".format(value)]
+		subprocess.run(cmd)
 
 
-pre_distance = None
+
+pre_distance = 	None
+
+
+
+
+
+
 
 
 @torch.no_grad()
@@ -222,25 +221,18 @@ def run(
             else:
                 p, im0, frame = path, im0s.copy(), getattr(dataset, 'frame', 0)
 
-            global distance, count_frame
-            count_frame += 1
+            global distance 
             thickness = 2
 
-            if count_frame % 5 == 0:
-                distance = tof.get_distance()      # measure the distance
-
-            if distance < 10 and count_frame > 40:                   # return to previous value if distance < 0
+            distance = tof.get_distance()      # measure the distance
+            if distance < 0:                   # return to previous value if distance < 0
                 if pre_distance is not None:
                     distance = pre_distance
-
             else:
                 pre_distance = distance
 
             distance_mm = str(distance) + "mm"
-            cv2.putText(im0, distance_mm, (20, 40), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), thickness)    # display the distance  
-
-            
-
+            text_dis = cv2.putText(im0, distance_mm, (20, 40), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), thickness)    # display the distance
    
             current_time = time.time()
             fps = 1 / (current_time - prev_time)
@@ -249,11 +241,6 @@ def run(
             
             cv2.line(im0, (640 - 20, 360), (640 + 20, 360), (0, 0, 255), 2)
             cv2.line(im0, (640, 360 - 20), (640, 360 + 20), (0, 0, 255), 2)
-
-#            if count_frame % 20 == 0:
-#                turret_data_set = "000000000000" + str(turret_system.get_fire())
-#                send_data_uart(turret_data_set)
-
             prev_time = current_time
 
             p = Path(p)  # to Path
@@ -273,7 +260,7 @@ def run(
                     n = (det[:, -1] == c).sum()  # detections per class
 #                    s += f"{n} {names[int(c)]}{center_point}{'s' * (n > 1)}, "  # add to string
 
-                global sw_select, coordinate, last_coordinate, prev_coordinate
+                global sw_select
                 # Write results
                 for *xyxy, conf, cls in det:
                     c = int(cls)
@@ -285,14 +272,11 @@ def run(
                         if bbox_width < 850 and bbox_height < 480:
                             c1, c2 = (int(xyxy[0]), int(xyxy[1])), (int(xyxy[2]), int(xyxy[3]))   # seting the center coordinate of bbox
                             center_point = round((c1[0] + c2[0])/2), round((c1[1] + c2[1])/2)
-                            center_point_text = round((c1[0] + c2[0])/2), round(720 - (c1[1] + c2[1])/2)
-                            if distance > 2100:
-                                coordinate = round((c1[0] + c2[0])/2), round(721 - (c1[1] + c2[1])/2) + 60
-                            elif distance <= 2100:
-                                coordinate = round((c1[0] + c2[0])/2), round(721 - (c1[1] + c2[1])/2) + 20
+                            global coordinate, last_coordinate, prev_coordinate
+                            coordinate = round((c1[0] + c2[0])/2), round(719 - (c1[1] + c2[1])/2)
 
                             circle = cv2.circle(im0, center_point, 5, (255, 0, 0), 2)    # display the center coordinate & center circle         
-                            text_coord = cv2.putText(im0, str(center_point_text), center_point, cv2.FONT_HERSHEY_PLAIN, 1, (0, 0, 255))
+                            text_coord = cv2.putText(im0, str(coordinate), center_point, cv2.FONT_HERSHEY_PLAIN, 1, (0, 0, 255))
 
                             last_coordinate = coordinate
 
@@ -341,39 +325,43 @@ def run(
 #                cv2.imshow('Webcam', im0)             
 #                cv2.waitKey(1)  # 1 millisecond
 
+            global last_sent_time, counter, direction
+            if (turret_system.get_mode() == 2 and sw_select == False):
+                sw_select = False
+                if (last_sent_time is None) or (time.time() - last_sent_time) >= 2:
+
+                   if counter % 2 == 0:
+                       send_data_i2c("126000000000")
+                   elif counter % 2 == 1:
+                       send_data_i2c("002000000000")
+
+                   counter = counter + 1
+                   last_sent_time = time.time()
+            else:                
+                last_sent_time = None
             
-            
-            global prev_turret_mode, turret_data, status, distance_formatted, distance_set
+            global prev_turret_mode
             if prev_coordinate is not None and last_coordinate is not None:
                 global send_count, delta_x, delta_y
-                
+                print(delta_x)
                 delta_x = abs(last_coordinate[0] - prev_coordinate[0])
                 delta_y = abs(last_coordinate[1] - prev_coordinate[1])
-                if(distance >= 2100):
-                    distance_set = 2
-                elif(distance < 2100):
-                    distance_set = 3
-                if prev_turret_mode == 0 and (turret_system.get_mode() == 1):
+                if prev_turret_mode == 0 and (turret_system.get_mode() == 1 or turret_system.get_mode() == 2):
                    send_count = 1
                     
-                if (send_count > 0 or (delta_x >= distance_set or delta_y >= distance_set)) and (turret_system.get_mode() == 1):
+
+                if (send_count > 0 or (delta_x >= 5 or delta_y >= 5)) and (turret_system.get_mode() == 1 or turret_system.get_mode() == 2):
                     distance_formatted = "{:04}".format(distance)            # convert distance value to 4-digit str
-                    turret_data = str(str(coord(coordinate)) + distance_formatted + str(turret_system.get_fire()))  # combine coordinate & distance data to 13-digit str
-                    #print(turret_data)
-                    send_data_uart(turret_data)                               # send to esp32
+                    turret_data = str(str(coord(coordinate)) + distance_formatted)  # combine coordinate & distance data to 12-digit str
+
+                    send_data_i2c(turret_data)                               # send to esp32
+#                    print(turret_data)
                     if send_count > 0:
                         send_count -= 1
 
             prev_coordinate = last_coordinate
 
             prev_turret_mode = turret_system.get_mode()
-
-            current_status = turret_system.get_fire()
-            if current_status != status:
-                turret_data = "000000000000" + str(turret_system.get_fire())
-                print(turret_data)
-                send_data_uart(turret_data)
-                status = current_status
 
                      
                        
@@ -433,8 +421,7 @@ def parse_opt():
 
 
 def main(opt):
-    cmd = ["v4l2-ctl", "--set-ctrl=zoom_absolute={}".format(0)]
-    subprocess.run(cmd)
+    
     check_requirements(exclude=('tensorboard', 'thop'))
     run(**vars(opt))
 
